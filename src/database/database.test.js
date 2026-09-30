@@ -191,6 +191,17 @@ test("creates a franchise and assigns its admins", async () => {
   });
 });
 
+test("throws a 404 when a franchise admin does not exist", async () => {
+  jest.spyOn(DB, "query").mockResolvedValueOnce([]);
+  const franchise = { name: "Main", admins: [{ email: "missing@test.com" }] };
+
+  await expect(DB.createFranchise(franchise)).rejects.toMatchObject({
+    message: "unknown user for franchise admin missing@test.com provided",
+    statusCode: 404,
+  });
+  expect(mockConnection.end).toHaveBeenCalled();
+});
+
 test("rolls back a failed franchise deletion", async () => {
   jest
     .spyOn(DB, "query")
