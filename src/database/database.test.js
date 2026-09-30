@@ -337,3 +337,14 @@ test("initializes the default admin when the database is new", async () => {
     }),
   );
 });
+
+test("logs database initialization errors", async () => {
+  const error = new Error("connection failed");
+  jest.spyOn(DB, "_getConnection").mockRejectedValue(error);
+  const consoleError = jest.spyOn(console, "error").mockImplementation();
+
+  await DB.initializeDatabase();
+
+  expect(consoleError).toHaveBeenCalled();
+  consoleError.mockRestore();
+});
