@@ -202,6 +202,35 @@ test("throws a 404 when a franchise admin does not exist", async () => {
   expect(mockConnection.end).toHaveBeenCalled();
 });
 
+test("deletes the franchise data in a transaction", async () => {
+  const query = jest.spyOn(DB, "query").mockResolvedValue([]);
+
+  await expect(DB.deleteFranchise(5)).resolves.toBeUndefined();
+
+  expect(mockConnection.beginTransaction).toHaveBeenCalled();
+  expect(query).toHaveBeenNthCalledWith(
+    1,
+    mockConnection,
+    "DELETE FROM store WHERE franchiseId=?",
+    [5],
+  );
+  expect(query).toHaveBeenNthCalledWith(
+    2,
+    mockConnection,
+    "DELETE FROM userRole WHERE objectId=?",
+    [5],
+  );
+  expect(query).toHaveBeenNthCalledWith(
+    3,
+    mockConnection,
+    "DELETE FROM franchise WHERE id=?",
+    [5],
+  );
+  expect(mockConnection.commit).toHaveBeenCalled();
+  expect(mockConnection.rollback).not.toHaveBeenCalled();
+  expect(mockConnection.end).toHaveBeenCalled();
+});
+
 test("rolls back a failed franchise deletion", async () => {
   jest
     .spyOn(DB, "query")
