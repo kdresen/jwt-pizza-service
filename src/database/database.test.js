@@ -321,3 +321,19 @@ test("initializes an existing database", async () => {
   expect(mockConnection.query).toHaveBeenCalled();
   expect(mockConnection.end).toHaveBeenCalled();
 });
+
+test("initializes the default admin when the database is new", async () => {
+  jest.spyOn(DB, "_getConnection").mockResolvedValue(mockConnection);
+  jest.spyOn(DB, "checkDatabaseExists").mockResolvedValue(false);
+  jest.spyOn(DB, "addUser").mockResolvedValue({});
+  mockConnection.query.mockResolvedValue([[]]);
+
+  await DB.initializeDatabase();
+
+  expect(DB.addUser).toHaveBeenCalledWith(
+    expect.objectContaining({
+      email: "a@jwt.com",
+      roles: [{ role: Role.Admin }],
+    }),
+  );
+});
