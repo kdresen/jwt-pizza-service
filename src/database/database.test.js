@@ -73,6 +73,71 @@ test("adds a user and assigns a role", async () => {
   expect(mockConnection.end).toHaveBeenCalled();
 });
 
+test("gets users with pagination, name filtering, and roles", async () => {
+  jest
+    .spyOn(DB, "query")
+    .mockResolvedValueOnce([
+      { id: 7, name: "Diner", email: "diner@test.com" },
+      { id: 8, name: "Admin", email: "admin@test.com" },
+      { id: 9, name: "More", email: "more@test.com" },
+    ])
+    .mockResolvedValueOnce([{ role: Role.Diner, objectId: 0 }])
+    .mockResolvedValueOnce([{ role: Role.Admin, objectId: 0 }]);
+
+  await expect(DB.getUsers(1, 2, "Di*")).resolves.toEqual([
+    [
+      {
+        id: 7,
+        name: "Diner",
+        email: "diner@test.com",
+        roles: [{ role: Role.Diner, objectId: undefined }],
+      },
+      {
+        id: 8,
+        name: "Admin",
+        email: "admin@test.com",
+        roles: [{ role: Role.Admin, objectId: undefined }],
+      },
+    ],
+    true,
+  ]);
+  expect(DB.query).toHaveBeenNthCalledWith(
+    1,
+    mockConnection,
+    "SELECT id, name, email FROM user WHERE name LIKE ? LIMIT 3 OFFSET 2",
+    ["Di%"],
+  );
+  expect(mockConnection.end).toHaveBeenCalled();
+});
+
+test("deletes a user in a transaction", async () => {
+  jest.spyOn(DB, "query").mockResolvedValue({});
+
+  await DB.deleteUser(7);
+
+  expect(DB.query).toHaveBeenNthCalledWith(
+    1,
+    mockConnection,
+    "DELETE FROM auth WHERE userId=?",
+    [7],
+  );
+  expect(DB.query).toHaveBeenNthCalledWith(
+    2,
+    mockConnection,
+    "DELETE FROM userRole WHERE userId=?",
+    [7],
+  );
+  expect(DB.query).toHaveBeenNthCalledWith(
+    3,
+    mockConnection,
+    "DELETE FROM user WHERE id=?",
+    [7],
+  );
+  expect(mockConnection.beginTransaction).toHaveBeenCalled();
+  expect(mockConnection.commit).toHaveBeenCalled();
+  expect(mockConnection.end).toHaveBeenCalled();
+});
+
 test("adds a franchisee user using the franchise ID", async () => {
   jest
     .spyOn(DB, "query")
