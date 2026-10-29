@@ -2,6 +2,8 @@ const { StatusCodeError } = require("./endpointHelper");
 const request = require("supertest");
 const app = require("./service");
 
+beforeAll(async () => {});
+
 test("StatusCodeError stores the message and status code", () => {
   const error = new StatusCodeError("Bad request", 400);
 
