@@ -98,6 +98,12 @@ jobs:
         uses: actions/download-artifact@v8.0.2
         with:
           name: package
+      - name: Create OIDC token to AWS
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          audience: sts.amazonaws.com
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::${{ screts.AWS_ACCOUNT }}:role/${{ secrets.CI_IAM_ROLE }}
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
