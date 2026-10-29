@@ -5,5 +5,8 @@
     "global": {
       "lines": 80
     }
-  }
+  },
+  "testPathIgnorePatterns": ["/node_modules/", "/dist/"],
+  "modulePathIgnorePatterns": ["/dist/"],
+  "coveragePathIgnorePatterns": ["/node_modules/", "/dist/"]
 }

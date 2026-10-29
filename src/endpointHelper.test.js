@@ -57,6 +57,9 @@ async function loginAsAdmin(service) {
   const loginRes = await service
     .put("/api/auth")
     .send({ email: "a@jwt.com", password: "admin" });
+
+  console.log("Admin login status:", loginRes.status);
+  console.log("Admin login response:", loginRes.body);
   return loginRes.body.token;
 }
 
