@@ -430,16 +430,36 @@ test("initializes an existing database", async () => {
 test("initializes the default admin when the database is new", async () => {
   jest.spyOn(DB, "_getConnection").mockResolvedValue(mockConnection);
   jest.spyOn(DB, "checkDatabaseExists").mockResolvedValue(false);
-  jest.spyOn(DB, "addUser").mockResolvedValue({});
+
   mockConnection.query.mockResolvedValue([[]]);
+
+  mockConnection.execute.mockImplementation(async (sql) => {
+    if (sql === "SELECT id FROM user WHERE email = ?") {
+      return [[]]; // Admin doesn't exist
+    }
+
+    if (sql === "INSERT INTO user (name, email, password) VALUES (?, ?, ?)") {
+      return [{ insertId: 1 }]; // Simulate MySQL returning new user ID
+    }
+
+    return [{}];
+  });
 
   await DB.initializeDatabase();
 
-  expect(DB.addUser).toHaveBeenCalledWith(
-    expect.objectContaining({
-      email: "a@jwt.com",
-      roles: [{ role: Role.Admin }],
-    }),
+  expect(mockConnection.execute).toHaveBeenCalledWith(
+    "SELECT id FROM user WHERE email = ?",
+    ["a@jwt.com"],
+  );
+
+  expect(mockConnection.execute).toHaveBeenCalledWith(
+    "INSERT INTO user (name, email, password) VALUES (?, ?, ?)",
+    ["常用名字", "a@jwt.com", expect.any(String)],
+  );
+
+  expect(mockConnection.execute).toHaveBeenCalledWith(
+    "INSERT INTO userRole (userId, role, objectId) VALUES (?, ?, ?)",
+    [1, Role.Admin, 0],
   );
 });
 
