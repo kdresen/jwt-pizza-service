@@ -536,16 +536,11 @@ class DB {
           console.log("Default admin created");
         }
       } finally {
-        connection.end();
+        await connection.end();
       }
     } catch (err) {
-      console.error(
-        JSON.stringify({
-          message: "Error initializing database",
-          exception: err.message,
-          connection: config.db.connection,
-        }),
-      );
+      console.error("Error initializing database:", err);
+      throw err;
     }
   }
 
