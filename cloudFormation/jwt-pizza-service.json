@@ -11,24 +11,24 @@
     "CertificateArn": {
       "Type": "String",
       "Description": "Load balancer web certificate ARN use to support HTTPS on the ALB",
-      "Default": ""
+      "Default": "arn:aws:acm:us-east-1:571561178478:certificate/b979e16a-e698-468d-8193-3a042cd15dd6"
     },
     "VpcID": {
       "Type": "String",
       "Description": "The ID of the VPC for the ALB",
-      "Default": "",
+      "Default": "vpc-02581fbfc303c2d8f",
       "AllowedPattern": "^(?:vpc-[0-9a-f]{8,17}|)$",
       "ConstraintDescription": "VPC ID must begin with 'vpc-' and have a valid uuid"
     },
     "SubnetIDs": {
       "Type": "CommaDelimitedList",
       "Description": "A comma delimited list of VPC network subnets for the ECS service and ALB",
-      "Default": ""
+      "Default": "subnet-0d758390f2f8d8f47, subnet-006fffe47f3860a73, subnet-00ae63ed7163dfd2f, subnet-0470227ea3f4421a5, subnet-02d30ece81f2f3ef0, subnet-095c8abea99dac8e8"
     },
     "SecurityGroupIDs": {
       "Type": "CommaDelimitedList",
       "Description": "ECS service and ALB Security groups",
-      "Default": ""
+      "Default": "sg-01d786f75c0337e88"
     }
   },
 
