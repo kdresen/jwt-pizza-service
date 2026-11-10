@@ -5,8 +5,8 @@
     "name": "kak4ds7",
     "namespace": "stacks-1916431",
     "uid": "dd59bac8-66e0-4486-9ce1-abd6e1a50428",
-    "resourceVersion": "2120288667440107520",
-    "generation": 29,
+    "resourceVersion": "2120292473833902080",
+    "generation": 35,
     "creationTimestamp": "2026-11-10T21:35:15Z",
     "labels": {
       "grafana.app/deprecatedInternalID": "3577253894094848"
@@ -15,7 +15,7 @@
       "grafana.app/createdBy": "user:ag3wdmar62mf4f",
       "grafana.app/saved-from-ui": "Grafana Cloud",
       "grafana.app/updatedBy": "user:ag3wdmar62mf4f",
-      "grafana.app/updatedTimestamp": "2026-11-10T22:53:05Z"
+      "grafana.app/updatedTimestamp": "2026-11-10T23:08:13Z"
     }
   },
   "spec": {
@@ -150,7 +150,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(rate(pizza_purchase_duration_ms_milliseconds_sum{service_name=\"jwt-pizza-service\"}[5m]))\r\n/\r\nsum(rate(pizza_purchase_duration_ms_milliseconds_count{service_name=\"jwt-pizza-service\"}[5m]))",
+                        "expr": "(\r\n  sum(\r\n    rate(pizza_purchase_duration_ms_milliseconds_sum{\r\n      service_name=\"jwt-pizza-service\"\r\n    }[5m])\r\n  )\r\n  /\r\n  sum(\r\n    rate(pizza_purchase_duration_ms_milliseconds_count{\r\n      service_name=\"jwt-pizza-service\"\r\n    }[5m])\r\n  )\r\n) or vector(0)",
                         "legendFormat": "Pizza latency",
                         "range": true
                       }
@@ -385,7 +385,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "count(\r\n  sum by (user_id) (\r\n    increase(active_user_requests_total{service_name=\"jwt-pizza-service\"}[5m])\r\n  ) > 0\r\n)",
+                        "expr": "count(\r\n  sum by (user_id) (\r\n    increase(active_user_requests_total{\r\n      service_name=\"jwt-pizza-service\"\r\n    }[5m])\r\n  ) > 0\r\n) or vector(0)",
                         "legendFormat": "__auto",
                         "range": true
                       }
@@ -434,7 +434,8 @@
                     ]
                   },
                   "color": {
-                    "mode": "palette-classic"
+                    "mode": "palette-classic",
+                    "seriesBy": "last"
                   },
                   "custom": {
                     "axisBorderShow": false,
@@ -445,8 +446,8 @@
                     "barAlignment": 0,
                     "barWidthFactor": 0.6,
                     "drawStyle": "line",
-                    "fillOpacity": 0,
-                    "gradientMode": "none",
+                    "fillOpacity": 27,
+                    "gradientMode": "opacity",
                     "hideFrom": {
                       "legend": false,
                       "tooltip": false,
@@ -454,8 +455,11 @@
                     },
                     "insertNulls": false,
                     "lineInterpolation": "linear",
+                    "lineStyle": {
+                      "fill": "solid"
+                    },
                     "lineWidth": 1,
-                    "pointSize": 5,
+                    "pointSize": 4,
                     "scaleDistribution": {
                       "type": "linear"
                     },
@@ -500,7 +504,7 @@
                       },
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum(rate(http_request_duration_ms_milliseconds_sum{service_name=\"jwt-pizza-service\"}[5m]))\r\n/\r\nsum(rate(http_request_duration_ms_milliseconds_count{service_name=\"jwt-pizza-service\"}[5m]))",
+                        "expr": "(\r\n  sum(\r\n    rate(http_request_duration_ms_milliseconds_sum{\r\n      service_name=\"jwt-pizza-service\"\r\n    }[5m])\r\n  )\r\n  /\r\n  sum(\r\n    rate(http_request_duration_ms_milliseconds_count{\r\n      service_name=\"jwt-pizza-service\"\r\n    }[5m])\r\n  )\r\n) or vector(0)",
                         "legendFormat": "Request latency",
                         "range": true
                       }
@@ -987,7 +991,8 @@
                     ]
                   },
                   "color": {
-                    "mode": "palette-classic"
+                    "mode": "thresholds",
+                    "seriesBy": "last"
                   },
                   "custom": {
                     "axisBorderShow": false,
@@ -997,9 +1002,9 @@
                     "axisPlacement": "auto",
                     "barAlignment": 0,
                     "barWidthFactor": 0.6,
-                    "drawStyle": "bars",
-                    "fillOpacity": 0,
-                    "gradientMode": "none",
+                    "drawStyle": "line",
+                    "fillOpacity": 39,
+                    "gradientMode": "scheme",
                     "hideFrom": {
                       "legend": false,
                       "tooltip": false,
@@ -1007,12 +1012,16 @@
                     },
                     "insertNulls": false,
                     "lineInterpolation": "linear",
+                    "lineStyle": {
+                      "dash": [10, 10],
+                      "fill": "dash"
+                    },
                     "lineWidth": 1,
                     "pointSize": 5,
                     "scaleDistribution": {
                       "type": "linear"
                     },
-                    "showPoints": "auto",
+                    "showPoints": "never",
                     "showValues": false,
                     "spanNulls": false,
                     "stacking": {
@@ -1280,9 +1289,9 @@
     "tags": [],
     "timeSettings": {
       "timezone": "browser",
-      "from": "now-6h",
+      "from": "now-1h",
       "to": "now",
-      "autoRefresh": "",
+      "autoRefresh": "5s",
       "autoRefreshIntervals": [
         "5s",
         "10s",
