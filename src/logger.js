@@ -75,7 +75,7 @@ class Logger {
       if (!response.ok) {
         console.error(`Failed to send log to Grafana: ${response.status}`);
       }
-    } catch (error) {
+    } catch {
       console.error("Grafana logging request failed");
     }
   }
@@ -98,7 +98,7 @@ class Logger {
 
       // Do not block application requests while sending logs
       void this.sendLogToGrafana(event);
-    } catch (error) {
+    } catch {
       console.error("Failed to construct log");
     }
   }
