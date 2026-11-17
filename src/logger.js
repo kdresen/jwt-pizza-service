@@ -19,19 +19,31 @@ class Logger {
 
   // Remove sensitive information from log objects
   sanitize(data) {
-    const sensitiveFields =
-      /password|passwd|secret|token|authorization|api.?key|cookie|credential|jwt|session/i;
+    const sensitiveKey =
+      /password|passwd|secret|token|authorization|api.?key|cookie|credential|jwt|session|email|reporturl|followlink/i;
 
     const seen = new WeakSet();
 
+    const redactString = (value) => {
+      // Remove bearer tokens embedded in strings.
+      let result = value.replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]");
+
+      // Avoid logging URL query parameters, which may contain secrets.
+      result = result.replace(
+        /https?:\/\/[^\s"'<>]+/gi,
+        (url) => url.split("?")[0].split("#")[0],
+      );
+
+      return result;
+    };
+
     return JSON.stringify(data, (key, value) => {
-      if (sensitiveFields.test(key)) {
+      if (sensitiveKey.test(key)) {
         return "[REDACTED]";
       }
 
       if (typeof value === "string") {
-        // Redact bearer tokens appearing in strings.
-        return value.replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]");
+        return redactString(value);
       }
 
       if (value && typeof value === "object") {
@@ -64,7 +76,7 @@ class Logger {
         console.error(`Failed to send log to Grafana: ${response.status}`);
       }
     } catch (error) {
-      console.error("Grafana logging error:", error.message);
+      console.error("Grafana logging request failed");
     }
   }
 
@@ -87,50 +99,52 @@ class Logger {
       // Do not block application requests while sending logs
       void this.sendLogToGrafana(event);
     } catch (error) {
-      console.error("Failed to construct log:", error.message);
+      console.error("Failed to construct log");
     }
   }
 
   httpLogger = (req, res, next) => {
     const start = performance.now();
 
-    // Capture the response body
-    const originalJson = res.json.bind(res);
-    const originalSend = res.send.bind(res);
+    const originalSend = res.send;
     let responseBody;
 
-    res.json = (body) => {
+    res.send = function (body) {
       responseBody = body;
-      return originalJson(body);
-    };
-
-    res.send = (body) => {
-      if (responseBody === undefined) {
-        responseBody = body;
-      }
-      return originalSend(body);
+      return originalSend.call(this, body);
     };
 
     res.on("finish", () => {
-      const logData = {
+      const path = req.path;
+
+      // Only record bodies for endpoints we've reviewed.
+      const safeBodyPaths = new Set(["/"]);
+
+      const allowBody = safeBodyPaths.has(path);
+
+      let safeResponseBody = "[OMITTED]";
+
+      if (allowBody && responseBody !== undefined) {
+        try {
+          safeResponseBody =
+            typeof responseBody === "string"
+              ? JSON.parse(responseBody)
+              : responseBody;
+        } catch {
+          safeResponseBody = "[NON-JSON RESPONSE OMITTED]";
+        }
+      }
+
+      this.log(this.statusToLogLevel(res.statusCode), "http", {
         method: req.method,
-        path: req.path,
+        path,
         statusCode: res.statusCode,
         authorized: Boolean(req.headers.authorization),
         userId: req.user?.id ?? null,
-
-        requestBody: req.path.startsWith("/api/auth")
-          ? "[AUTHENTICATION BODY OMITTED]"
-          : req.body,
-
-        responseBody: req.path.startsWith("/api/auth")
-          ? "[AUTHENTICATION RESPONSE OMITTED]"
-          : responseBody,
-
+        requestBody: allowBody ? (req.body ?? null) : "[OMITTED]",
+        responseBody: safeResponseBody,
         latencyMs: performance.now() - start,
-      };
-
-      this.log(this.statusToLogLevel(res.statusCode), "http", logData);
+      });
     });
 
     next();

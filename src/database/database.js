@@ -5,6 +5,7 @@ const logger = require("../logger.js");
 const { StatusCodeError } = require("../endpointHelper.js");
 const { Role } = require("../model/model.js");
 const dbModel = require("./dbModel.js");
+const requestContext = require("../requestContext.js");
 class DB {
   constructor() {
     this.initialized = this.initializeDatabase();
@@ -110,8 +111,19 @@ class DB {
 
   async getUsers(page = 0, limit = 10, nameFilter = "*") {
     const connection = await this.getConnection();
-    const offset = Number(page) * Number(limit);
+    const pageNumber = Number(page);
     const userLimit = Number(limit);
+
+    if (
+      !Number.isSafeInteger(pageNumber) ||
+      pageNumber < 0 ||
+      !Number.isSafeInteger(userLimit) ||
+      userLimit < 1
+    ) {
+      throw new StatusCodeError("Invalid pagination parameters", 400);
+    }
+
+    const offset = pageNumber * userLimit;
     nameFilter = nameFilter.replace(/\*/g, "%");
 
     try {
@@ -147,20 +159,32 @@ class DB {
   async updateUser(userId, name, email, password) {
     const connection = await this.getConnection();
     try {
-      const params = [];
+      const updates = [];
+      const values = [];
+
       if (password) {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        params.push(`password='${hashedPassword}'`);
+        updates.push("password=?");
+        values.push(await bcrypt.hash(password, 10));
       }
+
       if (email) {
-        params.push(`email='${email}'`);
+        updates.push("email=?");
+        values.push(email);
       }
+
       if (name) {
-        params.push(`name='${name}'`);
+        updates.push("name=?");
+        values.push(name);
       }
-      if (params.length > 0) {
-        const query = `UPDATE user SET ${params.join(", ")} WHERE id=${userId}`;
-        await this.query(connection, query);
+
+      if (updates.length > 0) {
+        values.push(userId);
+
+        await this.query(
+          connection,
+          `UPDATE user SET ${updates.join(", ")} WHERE id=?`,
+          values,
+        );
       }
       return this.getUser(email, password);
     } finally {
@@ -227,9 +251,20 @@ class DB {
   }
 
   async getOrders(user, page = 1) {
+    const pageNumber = Number(page);
+    const pageSize = Number(config.db.listPerPage);
+
+    if (
+      !Number.isSafeInteger(pageNumber) ||
+      pageNumber < 1 ||
+      !Number.isSafeInteger(pageSize) ||
+      pageSize < 1
+    ) {
+      throw new StatusCodeError("Invalid pagination parameters", 400);
+    }
     const connection = await this.getConnection();
     try {
-      const offset = this.getOffset(page, config.db.listPerPage);
+      const offset = (pageNumber - 1) * pageSize;
       const orders = await this.query(
         connection,
         `SELECT id, franchiseId, storeId, date FROM dinerOrder WHERE dinerId=? LIMIT ${offset},${config.db.listPerPage}`,
@@ -337,21 +372,31 @@ class DB {
   }
 
   async getFranchises(authUser, page = 0, limit = 10, nameFilter = "*") {
-    const connection = await this.getConnection();
+    const pageNumber = Number(page);
+    const limitNumber = Number(limit);
 
-    const offset = page * limit;
-    nameFilter = nameFilter.replace(/\*/g, "%");
+    if (
+      !Number.isSafeInteger(pageNumber) ||
+      pageNumber < 0 ||
+      !Number.isSafeInteger(limitNumber) ||
+      limitNumber < 1
+    ) {
+      throw new StatusCodeError("Invalid pagination parameters", 400);
+    }
+
+    const offset = pageNumber * limitNumber;
+    const connection = await this.getConnection();
 
     try {
       let franchises = await this.query(
         connection,
-        `SELECT id, name FROM franchise WHERE name LIKE ? LIMIT ${limit + 1} OFFSET ${offset}`,
+        `SELECT id, name FROM franchise WHERE name LIKE ? LIMIT ${limitNumber + 1} OFFSET ${offset}`,
         [nameFilter],
       );
 
-      const more = franchises.length > limit;
+      const more = franchises.length > limitNumber;
       if (more) {
-        franchises = franchises.slice(0, limit);
+        franchises = franchises.slice(0, limitNumber);
       }
 
       for (const franchise of franchises) {
@@ -384,9 +429,12 @@ class DB {
       }
 
       franchiseIds = franchiseIds.map((v) => v.objectId);
+      const placeholders = franchiseIds.map(() => "?").join(",");
+
       const franchises = await this.query(
         connection,
-        `SELECT id, name FROM franchise WHERE id in (${franchiseIds.join(",")})`,
+        `SELECT id, name FROM franchise WHERE id IN (${placeholders})`,
+        franchiseIds,
       );
       for (const franchise of franchises) {
         await this.getFranchise(franchise);
@@ -459,12 +507,14 @@ class DB {
 
   async query(connection, sql, params) {
     const start = performance.now();
+    const userId = requestContext.getStore()?.req?.user?.id ?? null;
 
     try {
       const [results] = await connection.execute(sql, params);
 
       logger.log("info", "db", {
         query: sql,
+        userId,
         success: true,
         resultCount: Array.isArray(results) ? results.length : undefined,
         latencyMs: performance.now() - start,
@@ -474,8 +524,9 @@ class DB {
     } catch (error) {
       logger.log("error", "db", {
         query: sql,
+        userId,
         success: false,
-        error: error.message,
+        errorCode: error.code ?? "DATABASE_ERROR",
         latencyMs: performance.now() - start,
       });
 
@@ -484,13 +535,25 @@ class DB {
   }
 
   async getID(connection, key, value, table) {
-    const [rows] = await connection.execute(
+    const allowed = {
+      menu: ["id"],
+      franchise: ["name"],
+    };
+
+    if (!allowed[table]?.includes(key)) {
+      throw new Error("Invalid database lookup");
+    }
+
+    const rows = await this.query(
+      connection,
       `SELECT id FROM ${table} WHERE ${key}=?`,
       [value],
     );
+
     if (rows.length > 0) {
       return rows[0].id;
     }
+
     throw new Error("No ID found");
   }
 
