@@ -1,6 +1,7 @@
 const mysql = require("mysql2/promise");
 const bcrypt = require("bcrypt");
 const config = require("../config.js");
+const logger = require("../logger.js");
 const { StatusCodeError } = require("../endpointHelper.js");
 const { Role } = require("../model/model.js");
 const dbModel = require("./dbModel.js");
@@ -457,8 +458,29 @@ class DB {
   }
 
   async query(connection, sql, params) {
-    const [results] = await connection.execute(sql, params);
-    return results;
+    const start = performance.now();
+
+    try {
+      const [results] = await connection.execute(sql, params);
+
+      logger.log("info", "db", {
+        query: sql,
+        success: true,
+        resultCount: Array.isArray(results) ? results.length : undefined,
+        latencyMs: performance.now() - start,
+      });
+
+      return results;
+    } catch (error) {
+      logger.log("error", "db", {
+        query: sql,
+        success: false,
+        error: error.message,
+        latencyMs: performance.now() - start,
+      });
+
+      throw error;
+    }
   }
 
   async getID(connection, key, value, table) {
