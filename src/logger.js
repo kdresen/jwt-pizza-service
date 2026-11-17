@@ -19,22 +19,19 @@ class Logger {
 
   // Remove sensitive information from log objects
   sanitize(data) {
-    const sensitiveFields = new Set([
-      "password",
-      "token",
-      "authorization",
-      "apikey",
-      "secret",
-      "jwt",
-      "cookie",
-      "set-cookie",
-    ]);
+    const sensitiveFields =
+      /password|passwd|secret|token|authorization|api.?key|cookie|credential|jwt|session/i;
 
     const seen = new WeakSet();
 
     return JSON.stringify(data, (key, value) => {
-      if (sensitiveFields.has(key.toLowerCase())) {
+      if (sensitiveFields.test(key)) {
         return "[REDACTED]";
+      }
+
+      if (typeof value === "string") {
+        // Redact bearer tokens appearing in strings.
+        return value.replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]");
       }
 
       if (value && typeof value === "object") {
@@ -117,12 +114,19 @@ class Logger {
     res.on("finish", () => {
       const logData = {
         method: req.method,
-        path: req.originalUrl,
+        path: req.path,
         statusCode: res.statusCode,
-        authorized: !!req.headers.authorization,
+        authorized: Boolean(req.headers.authorization),
         userId: req.user?.id ?? null,
-        requestBody: req.body,
-        responseBody,
+
+        requestBody: req.path.startsWith("/api/auth")
+          ? "[AUTHENTICATION BODY OMITTED]"
+          : req.body,
+
+        responseBody: req.path.startsWith("/api/auth")
+          ? "[AUTHENTICATION RESPONSE OMITTED]"
+          : responseBody,
+
         latencyMs: performance.now() - start,
       };
 

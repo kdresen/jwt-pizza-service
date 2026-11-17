@@ -1,4 +1,5 @@
 const metrics = require("./metrics.js");
+const requestContext = require("./requestContext.js");
 const express = require("express");
 const { authRouter, setAuthUser } = require("./routes/authRouter.js");
 const orderRouter = require("./routes/orderRouter.js");
@@ -9,10 +10,16 @@ const config = require("./config.js");
 const logger = require("./logger.js");
 
 const app = express();
+
+app.use((req, res, next) => {
+  requestContext.run({ req }, next);
+});
+
+app.use(logger.httpLogger);
 app.use(express.json());
 app.use(metrics.requestTracker);
 app.use(setAuthUser);
-app.use(logger.httpLogger);
+
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
@@ -55,11 +62,25 @@ app.use("*", (req, res) => {
 });
 
 // Default error handler for all exceptions and errors.
+// Centralized Express error handler
 app.use((err, req, res, next) => {
-  res
-    .status(err.statusCode ?? 500)
-    .json({ message: err.message, stack: err.stack });
-  next();
+  const statusCode = err.statusCode ?? err.status ?? 500;
+
+  logger.log(logger.statusToLogLevel(statusCode), "exception", {
+    errorType: err.name,
+    method: req.method,
+    path: req.path,
+    statusCode,
+    userId: req.user?.id ?? null,
+  });
+
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(statusCode).json({
+    message: statusCode >= 500 ? "Internal server error" : err.message,
+  });
 });
 
 module.exports = app;

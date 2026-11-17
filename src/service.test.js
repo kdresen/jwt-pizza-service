@@ -39,6 +39,13 @@ jest.mock("./routes/franchiseRouter.js", () => {
   return router;
 });
 
+jest.mock("./logger.js", () => ({
+  httpLogger: (req, res, next) => next(),
+  log: jest.fn(),
+  statusToLogLevel: jest.fn((status) =>
+    status >= 500 ? "error" : status >= 400 ? "warn" : "info",
+  ),
+}));
 const app = require("./service");
 
 test("returns the welcome message", async () => {
@@ -109,5 +116,20 @@ test("uses the error status code and message in the error handler", async () => 
 
   expect(response.status).toBe(418);
   expect(response.body.message).toBe("test failure");
-  expect(response.body.stack).toEqual(expect.any(String));
+  expect(response.body.stack).toBeUndefined();
+});
+
+test("logs exceptions through the Grafana logger", async () => {
+  const logger = require("./logger.js");
+
+  await request(app).get("/api/auth/error");
+
+  expect(logger.log).toHaveBeenCalledWith(
+    "warn",
+    "exception",
+    expect.objectContaining({
+      statusCode: 418,
+      path: "/api/auth/error",
+    }),
+  );
 });

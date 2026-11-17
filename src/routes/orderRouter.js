@@ -4,6 +4,7 @@ const config = require("../config.js");
 const { Role, DB } = require("../database/database.js");
 const { authRouter } = require("./authRouter.js");
 const { asyncHandler, StatusCodeError } = require("../endpointHelper.js");
+const logger = require("../logger.js");
 
 const orderRouter = express.Router();
 
@@ -123,6 +124,29 @@ orderRouter.post(
       0,
     );
 
+    const factoryRequest = {
+      diner: {
+        id: req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+      },
+      order,
+    };
+
+    // Explicitly select safe fields for logging.
+    const safeFactoryRequest = {
+      diner: { id: req.user.id },
+      order: {
+        id: order.id,
+        franchiseId: order.franchiseId,
+        storeId: order.storeId,
+        items: order.items.map((item) => ({
+          menuId: item.menuId,
+          price: item.price,
+        })),
+      },
+    };
+
     const start = performance.now();
 
     try {
@@ -132,18 +156,30 @@ orderRouter.post(
           "Content-Type": "application/json",
           authorization: `Bearer ${config.factory.apiKey}`,
         },
-        body: JSON.stringify({
-          diner: {
-            id: req.user.id,
-            name: req.user.name,
-            email: req.user.email,
-          },
-          order,
-        }),
+        body: JSON.stringify(factoryRequest),
       });
 
       const j = await r.json();
       const latency = performance.now() - start;
+
+      // Factory response can contain a JWT and a report URL.
+      // Log a safe summary rather than the raw response.
+      const safeFactoryResponse = {
+        success: r.ok,
+        hasReportUrl: Boolean(j.reportUrl),
+        hasJwt: Boolean(j.jwt),
+      };
+
+      logger.log(logger.statusToLogLevel(r.status), "factory", {
+        userId: req.user.id,
+        method: "POST",
+        service: "pizza-factory",
+        path: "/api/order",
+        statusCode: r.status,
+        requestBody: safeFactoryRequest,
+        responseBody: safeFactoryResponse,
+        latencyMs: latency,
+      });
 
       metrics.pizzaPurchase(r.ok, latency, r.ok ? price : 0, quantity);
 
@@ -161,6 +197,17 @@ orderRouter.post(
       }
     } catch (error) {
       const latency = performance.now() - start;
+
+      logger.log("error", "factory", {
+        userId: req.user.id,
+        method: "POST",
+        service: "pizza-factory",
+        path: "/api/order",
+        requestBody: safeFactoryRequest,
+        success: false,
+        errorType: error.name,
+        latencyMs: latency,
+      });
 
       metrics.pizzaPurchase(false, latency, 0, quantity);
       throw error;
