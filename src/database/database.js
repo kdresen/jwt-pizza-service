@@ -385,6 +385,7 @@ class DB {
     }
 
     const offset = pageNumber * limitNumber;
+    nameFilter = nameFilter.replace(/\*/g, "%");
     const connection = await this.getConnection();
 
     try {
