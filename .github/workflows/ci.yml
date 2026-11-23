@@ -143,3 +143,9 @@ jobs:
             --service jwt-pizza-service-next \
             --force-new-deployment \
             --region us-east-1
+      - name: Annotate deployment in Grafana
+        run: |
+          curl -s -X POST https://patientcoati3168.grafana.net/api/annotations \
+          -H "Authorization: Bearer ${{ secrets.GRAFANA_ACCESS_TOKEN }}" \
+          -H "Content-Type: application/json" \
+          -d '{"dashboardUID":"kak4ds7", "panelId":3, "tags":["backend","production"], "text":"Version '"$version"' deployed" }'
